@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Despesas Variaveis - Financas Familiares{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <a href="{{ url_for('dashboard', month=month_ctx.index, year=month_ctx.year) }}" class="back-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        Voltar
+    </a>
+</div>
+
+<div class="top-bar">
+    <div class="month-nav">
+        <a href="{{ url_for('variable_expenses', month=month_ctx.prev_month, year=month_ctx.prev_year) }}" aria-label="Mes anterior">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </a>
+        <div>
+            <div class="month-name">{{ month_ctx.name }}</div>
+            <div class="year-label">{{ month_ctx.year }}</div>
+        </div>
+        <a href="{{ url_for('variable_expenses', month=month_ctx.next_month, year=month_ctx.next_year) }}" aria-label="Proximo mes">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+    </div>
+</div>
+
+<!-- Total -->
+<div class="total-bar">
+    <div class="label">Total do Mes</div>
+    <div class="value">R$ {{ "{:.2f}".format(total).replace(".", ",") }}</div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <span>💸</span> Gastos Variaveis
+        </div>
+    </div>
+
+    {% if expenses %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Descricao</th>
+                <th>Tipo</th>
+                <th>Quem</th>
+                <th>Valor</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for expense in expenses %}
+            <tr>
+                <td>
+                    <div style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem;">{{ expense.description }}</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">{{ expense.date.strftime('%d/%m') if expense.date else '' }}</div>
+                </td>
+                <td>
+                    {% if expense.expense_type_id in types %}
+                    <span class="type-tag">
+                        <span class="dot" style="background: {{ types[expense.expense_type_id].color }}"></span>
+                        {{ types[expense.expense_type_id].name }}
+                    </span>
+                    {% else %}
+                    <span style="color: var(--text-muted); font-size: 0.8rem;">-</span>
+                    {% endif %}
+                </td>
+                <td style="font-size: 0.8rem;">{{ users[expense.user_id] }}</td>
+                <td style="font-weight: 700; font-size: 0.9rem;">R$ {{ "{:.2f}".format(expense.value).replace(".", ",") }}</td>
+                <td class="actions">
+                    <form method="POST" action="{{ url_for('delete_variable_expense', expense_id=expense.id) }}" style="display: inline;" onsubmit="return confirm('Remover este gasto?')">
+                        <button type="submit" class="btn-icon" title="Remover">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">📝</div>
+        <p>Nenhum gasto variavel este mes.</p>
+        <p style="margin-top: 8px; font-size: 0.8rem;">Clique em <strong>+ Gasto</strong> na barra inferior para adicionar.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

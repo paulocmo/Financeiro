@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Despesas Fixas - Financas Familiares<!-- Modal Pagar Despesa Fixa -->
+<div class="modal-overlay" id="payModal" onclick="if(event.target===this) this.classList.remove('active')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div class="modal-title">Pagar Despesa</div>
+            <button class="modal-close" onclick="document.getElementById('payModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" action="" id="payForm">
+            <div style="margin-bottom: 16px; padding: 12px; background: var(--bg-primary); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Despesa</div>
+                <div style="font-weight: 700; font-size: 1rem;" id="payDesc"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Valor Real (R$)</label>
+                <input type="text" name="real_value" class="form-input" id="payValue" placeholder="0,00" required>
+                <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Valor sugerido: R$ <span id="paySuggest"></span></div>
+            </div>
+            <button type="submit" class="btn-primary">Confirmar Pagamento</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPayModal(id, desc, value) {
+    const modal = document.getElementById('payModal');
+    const form = document.getElementById('payForm');
+    const descEl = document.getElementById('payDesc');
+    const valueEl = document.getElementById('payValue');
+    const suggestEl = document.getElementById('paySuggest');
+
+    form.action = `/fixed-expenses/pay/${id}?month={{ month_ctx.index }}&year={{ month_ctx.year }}`;
+    descEl.textContent = desc;
+    valueEl.value = value.toFixed(2).replace('.', ',');
+    suggestEl.textContent = value.toFixed(2).replace('.', ',');
+
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => valueEl.focus(), 100);
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('payModal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+});
+</script>
+
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <a href="{{ url_for('dashboard', month=month_ctx.index, year=month_ctx.year) }}" class="back-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        Voltar
+    </a>
+</div>
+
+<div class="top-bar">
+    <div class="month-nav">
+        <a href="{{ url_for('fixed_expenses', month=month_ctx.prev_month, year=month_ctx.prev_year) }}" aria-label="Mes anterior">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </a>
+        <div>
+            <div class="month-name">{{ month_ctx.name }}</div>
+            <div class="year-label">{{ month_ctx.year }}</div>
+        </div>
+        <a href="{{ url_for('fixed_expenses', month=month_ctx.next_month, year=month_ctx.next_year) }}" aria-label="Proximo mes">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <span>📋</span> Despesas Fixas
+        </div>
+        <button class="btn-secondary" onclick="document.getElementById('addFixedModal').classList.add('active')">+ Nova</button>
+    </div>
+
+    {% if expenses %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Descricao</th>
+                <th>Venc.</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for expense in expenses %}
+            <tr>
+                <td>
+                    <div style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem;">{{ expense.description }}</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">{{ users[expense.user_id] }}</div>
+                </td>
+                <td style="font-size: 0.8rem;">Dia {{ expense.due_day }}</td>
+                <td style="font-weight: 700; font-size: 0.9rem;">R$ {{ "{:.2f}".format(expense.value).replace(".", ",") }}</td>
+                <td>
+                    {% if expense.paid %}
+                    <span class="paid-badge">Pago</span>
+                    {% else %}
+                    <span class="pending-badge">Pendente</span>
+                    {% endif %}
+                </td>
+                <td class="actions">
+                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                        <form method="POST" action="{{ url_for('pay_fixed_expense', expense_id=expense.id) }}?month={{ month_ctx.index }}&year={{ month_ctx.year }}" style="display: inline;">
+                            <button type="submit" class="btn-icon" title="{% if expense.paid %}Marcar pendente{% else %}Marcar pago{% endif %}">
+                                {% if expense.paid %}↩️{% else %}✅{% endif %}
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('delete_fixed_expense', expense_id=expense.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza?')">
+                            <button type="submit" class="btn-icon" title="Remover">🗑️</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>Nenhuma despesa fixa cadastrada.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Fixed Expense Modal -->
+<div class="modal-overlay" id="addFixedModal" onclick="if(event.target===this) this.classList.remove('active')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div class="modal-title">Cadastrar Despesa Fixa</div>
+            <button class="modal-close" onclick="document.getElementById('addFixedModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('add_fixed_expense', month=month_ctx.index, year=month_ctx.year) }}">
+            <div class="form-group">
+                <label class="form-label">Descricao</label>
+                <input type="text" name="description" class="form-input" placeholder="Ex: Aluguel, Internet..." required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Valor Sugerido (R$)</label>
+                <input type="number" name="value" class="form-input" placeholder="0,00" step="0.01" min="0.01" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Dia de Vencimento</label>
+                <input type="number" name="due_day" class="form-input" placeholder="1-31" min="1" max="31" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Responsavel</label>
+                <select name="user_id" class="form-select" required>
+                    {% for u in all_users %}
+                    <option value="{{ u.id }}" {% if u.id == session.user_id %}selected{% endif %}>{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tipo</label>
+                <select name="expense_type_id" class="form-select">
+                    <option value="">Selecione...</option>
+                    {% for et in expense_types %}
+                    <option value="{{ et.id }}">{{ et.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" name="is_recurring" id="is_recurring" checked style="width: 18px; height: 18px; accent-color: var(--accent-orange); cursor: pointer;">
+                <label for="is_recurring" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; margin: 0;">
+                    Repetir todos os meses
+                </label>
+            </div>
+            <button type="submit" class="btn-primary">Cadastrar</button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Pagar Despesa Fixa -->
+<div class="modal-overlay" id="payModal" onclick="if(event.target===this) this.classList.remove('active')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div class="modal-title">Pagar Despesa</div>
+            <button class="modal-close" onclick="document.getElementById('payModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" action="" id="payForm">
+            <div style="margin-bottom: 16px; padding: 12px; background: var(--bg-primary); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Despesa</div>
+                <div style="font-weight: 700; font-size: 1rem;" id="payDesc"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Valor Real (R$)</label>
+                <input type="text" name="real_value" class="form-input" id="payValue" placeholder="0,00" required>
+                <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Valor sugerido: R$ <span id="paySuggest"></span></div>
+            </div>
+            <button type="submit" class="btn-primary">Confirmar Pagamento</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPayModal(id, desc, value) {
+    const modal = document.getElementById('payModal');
+    const form = document.getElementById('payForm');
+    const descEl = document.getElementById('payDesc');
+    const valueEl = document.getElementById('payValue');
+    const suggestEl = document.getElementById('paySuggest');
+
+    form.action = `/fixed-expenses/pay/${id}?month={{ month_ctx.index }}&year={{ month_ctx.year }}`;
+    descEl.textContent = desc;
+    valueEl.value = value.toFixed(2).replace('.', ',');
+    suggestEl.textContent = value.toFixed(2).replace('.', ',');
+
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => valueEl.focus(), 100);
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('payModal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+});
+</script>
+
+{% endblock %}

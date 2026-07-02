@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Financas Familiares{% endblock %}
+{% block content %}
+
+<!-- Month Navigation -->
+<div class="top-bar">
+    <div class="month-nav">
+        <a href="{{ url_for('dashboard', month=month_ctx.prev_month, year=month_ctx.prev_year) }}" aria-label="Mes anterior">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </a>
+        <div>
+            <div class="month-name">{{ month_ctx.name }}</div>
+            <div class="year-label">{{ month_ctx.year }}</div>
+        </div>
+        <a href="{{ url_for('dashboard', month=month_ctx.next_month, year=month_ctx.next_year) }}" aria-label="Proximo mes">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+    </div>
+</div>
+
+<!-- Balance -->
+<div class="balance-section">
+    <div class="balance-label">Conta Principal</div>
+    <div class="balance-value">
+        <span class="currency">R$</span>{{ "{:.2f}".format(account_balance).replace(".", ",") }}
+    </div>
+</div>
+
+<!-- Chart Card -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <span>📊</span> Despesas por Tipo
+        </div>
+    </div>
+    <div style="position: relative; height: 220px; margin-bottom: 16px;">
+        <canvas id="mainChart"></canvas>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;" id="chartLegend"></div>
+
+    <!-- User Mini Charts -->
+    <div style="display: flex; gap: 16px; justify-content: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+        {% for uid, udata in user_expense_data.items() %}
+        <div style="text-align: center; flex: 1;">
+            <div style="position: relative; width: 90px; height: 90px; margin: 0 auto;">
+                <canvas id="userChart{{ uid }}"></canvas>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">
+                    {{ ((udata.total / (user_expense_data.values() | map(attribute='total') | sum) * 100) | round(0) | int) if (user_expense_data.values() | map(attribute='total') | sum) > 0 else 0 }}%
+                </div>
+            </div>
+            <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-top: 8px;">{{ udata.name }}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">R$ {{ "{:.2f}".format(udata.total).replace(".", ",") }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Fixed Expenses Card -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <span>📋</span> Despesas Fixas
+        </div>
+        <div class="card-badge">{{ paid_fixed }}/{{ total_fixed }} pagas</div>
+    </div>
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: {{ (paid_fixed / total_fixed * 100) if total_fixed > 0 else 0 }}%"></div>
+    </div>
+
+    <div style="margin-top: 16px;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">
+            Pendentes
+        </div>
+        {% if pending_fixed %}
+            {% for expense in pending_fixed %}
+            <form method="POST" action="{{ url_for('toggle_fixed_expense', expense_id=expense.id) }}?month={{ month_ctx.index }}&year={{ month_ctx.year }}" class="expense-item">
+                <input type="checkbox" class="expense-checkbox" onchange="this.form.submit()">
+                <div class="expense-info">
+                    <div class="expense-name">
+                        {{ expense.description }}
+                        <span class="pending-badge">Pendente</span>
+                    </div>
+                    <div class="expense-meta">
+                        <span>Vence dia {{ expense.due_day }}</span>
+                        {% if expense.expense_type %}
+                        <span class="dot" style="background: {{ expense.expense_type.color }}"></span>
+                        <span>{{ expense.expense_type.name }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="expense-value pending">R$ {{ "{:.2f}".format(expense.value).replace(".", ",") }}</div>
+            </form>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="icon">🎉</div>
+                <p>Todas as despesas fixas estao pagas!</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 16px; text-align: center;">
+        <a href="{{ url_for('fixed_expenses', month=month_ctx.index, year=month_ctx.year) }}" style="color: var(--accent-orange); text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+            Ver todas as despesas fixas →
+        </a>
+    </div>
+</div>
+
+<!-- Recent Variable Expenses -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <span>💸</span> Gastos Recentes
+        </div>
+    </div>
+    {% if recent_variables %}
+        {% for expense in recent_variables %}
+        <div class="expense-item">
+            <div class="expense-info">
+                <div class="expense-name">{{ expense.description }}</div>
+                <div class="expense-meta">
+                    <span class="dot" style="background: {{ expense.expense_type.color if expense.expense_type else '#888' }}"></span>
+                    <span>{{ expense.expense_type.name if expense.expense_type else 'Sem tipo' }}</span>
+                    <span>•</span>
+                    <span>{{ users[expense.user_id] }}</span>
+                </div>
+            </div>
+            <div class="expense-value">R$ {{ "{:.2f}".format(expense.value).replace(".", ",") }}</div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <div class="icon">📝</div>
+            <p>Nenhum gasto registrado este mes.</p>
+        </div>
+    {% endif %}
+    <div style="margin-top: 16px; text-align: center;">
+        <a href="{{ url_for('variable_expenses', month=month_ctx.index, year=month_ctx.year) }}" style="color: var(--accent-orange); text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+            Ver todos os gastos →
+        </a>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Main Donut Chart
+    const chartLabels = {{ chart_labels | tojson }};
+    const chartData = {{ chart_data | tojson }};
+    const chartColors = {{ chart_colors | tojson }};
+
+    const ctxMain = document.getElementById('mainChart').getContext('2d');
+    new Chart(ctxMain, {
+        type: 'doughnut',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                data: chartData,
+                backgroundColor: chartColors,
+                borderColor: '#1D1D22',
+                borderWidth: 3,
+                hoverOffset: 8,
+                hoverBorderColor: '#FF6B00',
+                hoverBorderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1D1D22',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#A0A0B0',
+                    borderColor: 'rgba(255, 107, 0, 0.2)',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    padding: 12,
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = ((value / total) * 100).toFixed(1);
+                            return ` R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${pct}%)`;
+                        }
+                    }
+                }
+            },
+            animation: {
+                animateRotate: true,
+                animateScale: true,
+                duration: 1200,
+                easing: 'easeOutQuart'
+            }
+        }
+    });
+
+    // Custom Legend
+    const legendContainer = document.getElementById('chartLegend');
+    chartLabels.forEach((label, i) => {
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.style.cssText = 'display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-secondary);';
+        item.innerHTML = `<span style="width: 10px; height: 10px; border-radius: 50%; background: ${chartColors[i]}; display: inline-block;"></span><span>${label}</span>`;
+        legendContainer.appendChild(item);
+    });
+
+    // User Mini Charts
+    const userExpenseData = {{ user_expense_data | tojson }};
+    const totalAll = Object.values(userExpenseData).reduce((a, b) => a + b.total, 0);
+
+    Object.keys(userExpenseData).forEach(uid => {
+        const canvas = document.getElementById(`userChart${uid}`);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const userTotal = userExpenseData[uid].total;
+        const otherTotal = Math.max(totalAll - userTotal, 0.01);
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [userExpenseData[uid].name, 'Outros'],
+                datasets: [{
+                    data: [userTotal, otherTotal],
+                    backgroundColor: ['#FF6B00', 'rgba(255,255,255,0.05)'],
+                    borderColor: '#1D1D22',
+                    borderWidth: 2,
+                    hoverOffset: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                animation: { animateRotate: true, duration: 1000, easing: 'easeOutQuart' }
+            }
+        });
+    });
+</script>
+{% endblock %}

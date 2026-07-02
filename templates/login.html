@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Login - Financas Familiares{% endblock %}
+{% block content %}
+<div class="auth-container">
+    <div class="auth-logo">
+        <div class="logo-icon">💰</div>
+        <h1>Financas</h1>
+        <p>Gerencie suas financas em familia</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('login') }}" class="auth-form">
+        <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-input" placeholder="seu@email.com" required autofocus>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Senha</label>
+            <input type="password" name="password" class="form-input" placeholder="Sua senha" required>
+        </div>
+
+        <button type="submit" class="btn-primary btn-full">Entrar</button>
+    </form>
+
+    <div class="auth-footer">
+        <p>Nao tem conta? <a href="{{ url_for('register') }}">Cadastre-se</a></p>
+    </div>
+
+    <div class="demo-credentials">
+        <p><strong>Demo:</strong> paulo@familia.com / 123456</p>
+        <p><strong>Demo:</strong> cris@familia.com / 123456</p>
+    </div>
+</div>
+{% endblock %}
